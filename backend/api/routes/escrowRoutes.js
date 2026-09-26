@@ -54,6 +54,14 @@ router.post(
 );
 
 /**
+ * @route  POST /api/v1/escrows/templates/validate
+ * @desc   Validate an escrow template payload server-side (Issue #204).
+ *         Returns field-level errors for malformed milestones, addresses,
+ *         token ids, amount mismatches, and deadline violations.
+ */
+router.post('/templates/validate', escrowController.validateTemplate);
+
+/**
  * @route  GET /api/escrows/:id/milestones
  */
 router.get(

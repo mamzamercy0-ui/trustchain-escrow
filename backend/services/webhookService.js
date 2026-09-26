@@ -75,11 +75,39 @@ async function deleteSubscription({ id, createdBy }) {
   return deleted.count > 0;
 }
 
-async function getDeliveryHistory({ subscriptionId, createdBy, page = 1, limit = 30 }) {
+/**
+ * Return paginated delivery history for a subscription.
+ *
+ * Tenant-isolation is enforced by requiring the subscription to belong to
+ * `createdBy`.  Returns null when the subscription does not exist or belongs
+ * to a different owner so the controller can surface a 404.
+ *
+ * @param {object} opts
+ * @param {string}      opts.subscriptionId
+ * @param {string|null} opts.createdBy
+ * @param {number}      [opts.page=1]
+ * @param {number}      [opts.limit=30]
+ * @param {string|null} [opts.status]  - optional filter: pending | success | failed
+ */
+async function getDeliveryHistory({ subscriptionId, createdBy, page = 1, limit = 30, status = null }) {
+  // Verify the subscription exists and belongs to the caller before returning any rows.
+  const subscription = await prisma.webhookSubscription.findFirst({
+    where: { id: subscriptionId, createdBy },
+    select: { id: true },
+  });
+
+  if (!subscription) return null;
+
   const skip = (page - 1) * limit;
+
+  const deliveryWhere = {
+    subscriptionId,
+    ...(status ? { status } : {}),
+  };
+
   const [deliveries, total] = await Promise.all([
     prisma.webhookDelivery.findMany({
-      where: { subscription: { id: subscriptionId, createdBy } },
+      where: deliveryWhere,
       orderBy: { createdAt: 'desc' },
       skip,
       take: limit,
@@ -94,9 +122,7 @@ async function getDeliveryHistory({ subscriptionId, createdBy, page = 1, limit =
         createdAt: true,
       },
     }),
-    prisma.webhookDelivery.count({
-      where: { subscription: { id: subscriptionId, createdBy } },
-    }),
+    prisma.webhookDelivery.count({ where: deliveryWhere }),
   ]);
 
   return {

@@ -21,6 +21,7 @@ import {
   paginationQuery,
   handleValidationErrors,
 } from '../../middleware/validation.js';
+import { validateEscrowTemplate } from '../../services/escrowTemplateValidator.js';
 
 const ESCROW_SUMMARY_SELECT = {
   id: true,
@@ -581,6 +582,32 @@ export const cancelEscrowExport = async (req, res) => {
   }
 };
 
+// ── #204: Escrow template validation ─────────────────────────────────────────
+
+/**
+ * POST /api/v1/escrows/templates/validate
+ *
+ * Validates an escrow template payload server-side before any on-chain or
+ * database operation is attempted.  Returns field-level error details on
+ * failure so the client can surface actionable messages.
+ *
+ * Request body: EscrowTemplate object (see services/escrowTemplateValidator.js)
+ * Response 200: { valid: true }
+ * Response 422: { valid: false, errors: FieldError[] }
+ */
+const validateTemplate = (req, res) => {
+  try {
+    const result = validateEscrowTemplate(req.body);
+    if (result.valid) {
+      return res.status(200).json({ valid: true });
+    }
+    return res.status(422).json({ valid: false, errors: result.errors });
+  } catch (err) {
+    logControllerError('escrow.validateTemplate', err, req);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 export default {
   listEscrows,
   getEscrow,
@@ -596,6 +623,7 @@ export default {
   queueEscrowExport,
   getEscrowExportStatus,
   cancelEscrowExport,
+  validateTemplate,
 };
 
 // ── Validation rule sets (used by escrowRoutes) ───────────────────────────────
